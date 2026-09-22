@@ -1,0 +1,16 @@
+# The namespace the root manifests deliver into.
+#
+# It is declared here rather than left to ArgoCD because the `apps` Application Alethia renders
+# names a SERVER and no destination namespace, so its `CreateNamespace=true` sync option has
+# nothing to create. A manifest may name any namespace, but the namespace has to exist already —
+# so a repo that delivers into its own namespace ships the Namespace object alongside it.
+#
+# This is a CLUSTER-SCOPED resource, which the `apps` ArgoCD project permits on a DEDICATED
+# cluster and refuses on a namespace placement. See README.md, "Which placement this template
+# targets".
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: starter
+  labels:
+    app.kubernetes.io/part-of: alethia-starter-apps

@@ -1,0 +1,111 @@
+name: Validate
+
+# Free, and it runs on every push because the alternative is discovering a broken template the way
+# the last one was discovered: twenty minutes into a real cloud provision. Nothing here needs a
+# cluster, a credential or a cloud.
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  kustomize:
+    name: kustomize build (root + every overlay)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Ensure kubectl
+        run: |
+          set -euo pipefail
+          # `kubectl kustomize` is the kustomize build. The GitHub runner image ships kubectl
+          # today; this step means the day it stops is a 20-second download rather than a red
+          # template with no obvious cause.
+          if command -v kubectl >/dev/null 2>&1; then kubectl version --client; exit 0; fi
+          mkdir -p "$HOME/.local/bin"
+          v="$(curl -fsSL https://dl.k8s.io/release/stable.txt)"
+          curl -fsSL -o "$HOME/.local/bin/kubectl" "https://dl.k8s.io/release/$v/bin/linux/amd64/kubectl"
+          chmod +x "$HOME/.local/bin/kubectl"
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build the root and every overlay
+        run: |
+          set -euo pipefail
+          # DISCOVERED, never listed. A hand-written list is how an overlay gets added and silently
+          # skipped, and an overlay nobody builds is exactly what this job exists to prevent.
+          dirs=". $(find overlays -mindepth 1 -maxdepth 1 -type d | sort)"
+          for d in $dirs; do
+            echo "── kustomize build $d ──"
+            kubectl kustomize "$d" > /dev/null
+          done
+
+      - name: The root must render at least one resource
+        run: |
+          set -euo pipefail
+          # The failure this asserts against is silent: a root that renders nothing produces an
+          # ArgoCD Application that is Healthy and Synced while managing zero resources.
+          n="$(kubectl kustomize . | grep -c '^kind:' || true)"
+          echo "root renders $n resources"
+          [ "$n" -ge 1 ] || { echo "::error::the repository root renders no resources"; exit 1; }
+
+      - name: Every overlay must ship its own Namespace
+        run: |
+          set -euo pipefail
+          # The Applications Alethia renders name a server and no destination namespace, so
+          # CreateNamespace=true has nothing to create. An overlay without a Namespace object syncs
+          # against a namespace that may not exist, which fails late and confusingly.
+          fail=0
+          for d in overlays/*/; do
+            kubectl kustomize "$d" | grep -q '^kind: Namespace$' \
+              || { echo "::error::$d renders no Namespace"; fail=1; }
+          done
+          exit "$fail"
+
+      - name: The addons directory must exist
+        run: |
+          set -euo pipefail
+          # Alethia renders the `addons` Application whether or not the directory is there, and an
+          # absent directory leaves a red ComparisonError after a deploy that reported success.
+          [ -d addons ] || { echo "::error::addons/ is missing"; exit 1; }
+
+  version:
+    name: TEMPLATE_VERSION moves when the manifests do
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # Only in the template's own home. A clone is someone else's repository with its own release
+    # discipline, and failing their first commit because they edited the app we handed them would
+    # be a gate on the wrong thing.
+    if: github.repository_owner == 'alethialabs-io'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Compare
+        env:
+          BASE: ${{ github.event_name == 'pull_request' && github.event.pull_request.base.sha || '' }}
+        run: |
+          set -euo pipefail
+          base="${BASE:-$(git rev-parse HEAD^ 2>/dev/null || true)}"
+          if [ -z "$base" ]; then
+            echo "no base commit to compare against — nothing to check"
+            exit 0
+          fi
+          changed="$(git diff --name-only "$base" HEAD)"
+          manifests="$(echo "$changed" | grep -E '\.(yaml|yml)$' | grep -v '^\.github/' || true)"
+          if [ -z "$manifests" ]; then
+            echo "no delivered manifest changed"
+            exit 0
+          fi
+          echo "changed manifests:"; echo "$manifests"
+          if echo "$changed" | grep -qx 'TEMPLATE_VERSION'; then
+            echo "TEMPLATE_VERSION moved"
+            exit 0
+          fi
+          echo "::error::a delivered manifest changed and TEMPLATE_VERSION did not — see CHANGELOG.md"
+          exit 1

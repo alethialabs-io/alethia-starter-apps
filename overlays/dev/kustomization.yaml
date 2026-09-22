@@ -1,0 +1,38 @@
+# The dev environment.
+#
+# `overlays/*` is discovered automatically: an environment that names NO apps_path also gets an
+# `apps-overlays` ApplicationSet, which globs this directory and renders one Application per
+# overlay — `overlays/dev` becomes the Application `apps-dev`. Naming an apps_path turns that
+# discovery off and delivers the one path instead; both routes work with this directory as-is.
+#
+# `../../base` resolves because it is a DIRECTORY holding its own kustomization. A bare file above
+# this directory — `../../hello.yaml` — would not: kustomize's default load restrictor refuses a
+# file outside the kustomization root, which is why the base is a directory and not a loose file.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: starter-dev
+
+resources:
+  # The Namespace ships WITH the overlay. The generated Application names a server and no
+  # destination namespace, so its `CreateNamespace=true` has nothing to create, and a manifest
+  # whose namespace does not exist yet fails to sync.
+  - namespace.yaml
+  - ../../base
+
+replicas:
+  - name: hello
+    count: 1
+
+patches:
+  # Dev is the cheap tier: the smallest request that still schedules.
+  - target:
+      kind: Deployment
+      name: hello
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 10m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 32Mi

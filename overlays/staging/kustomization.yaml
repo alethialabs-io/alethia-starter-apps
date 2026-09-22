@@ -1,0 +1,28 @@
+# The staging environment: the same base, two replicas, and room to actually serve.
+#
+# Copy this directory to add an environment. `overlays/prod` is discovered the moment it is
+# committed — no Alethia-side change, no field to set.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: starter-staging
+
+resources:
+  - namespace.yaml
+  - ../../base
+
+replicas:
+  - name: hello
+    count: 2
+
+patches:
+  - target:
+      kind: Deployment
+      name: hello
+    patch: |
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/cpu
+        value: 50m
+      - op: replace
+        path: /spec/template/spec/containers/0/resources/requests/memory
+        value: 64Mi

@@ -1,0 +1,22 @@
+# THE ROOT MANIFEST. Do not delete this file without replacing it with another one.
+#
+# Alethia's root `apps` Application syncs this repository at `path: .` (or at the `apps_path` the
+# environment names). Two things follow, and both are the reason this file exists rather than a
+# tidier repository with nothing at the root:
+#
+#   1. A root with nothing in it produces an Application that manages zero resources — a deploy
+#      that reports success over an empty cluster.
+#   2. Alethia scaffolds generated service manifests into the root, and commits them, ONLY while
+#      the root holds no `.yaml` or `.yml` file. This file opts the repository out for good.
+#
+# It is a Kustomization rather than a copy of the application, so the root and the overlays deliver
+# the SAME base and cannot drift apart. ArgoCD detects the kustomization and builds it; the "reads
+# one directory and does not recurse" rule applies to plain-directory sources, not to this one.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: starter
+
+resources:
+  - namespace.yaml
+  - base

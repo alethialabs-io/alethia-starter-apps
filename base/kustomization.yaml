@@ -1,0 +1,16 @@
+# The application, once. Every environment in this repository is this base plus a patch.
+#
+# The base declares NO namespace. Each overlay sets one with the `namespace:` transformer and
+# ships the matching Namespace object, so an overlay is deliverable on its own — which matters,
+# because naming an `apps_path` in Alethia delivers exactly that one directory and nothing else.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - deployment.yaml
+  - service.yaml
+
+labels:
+  - includeSelectors: false
+    pairs:
+      app.kubernetes.io/part-of: alethia-starter-apps
