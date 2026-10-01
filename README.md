@@ -1,8 +1,12 @@
 # alethia-starter-apps
 
 A day-one **apps-destination repository** for [Alethia](https://alethialabs.io): the Git repository
-an environment points ArgoCD at. Use this template, point an environment at your copy, deploy, and
-three Applications converge — the root, `apps-dev` and `apps-staging`.
+an environment points ArgoCD at.
+
+## What it is
+
+Use this template, point an environment at your copy, deploy, and three Applications converge — the
+root, `apps-dev` and `apps-staging`.
 
 It is deliberately small. The value is not the workload; it is that every path in it is one the
 product actually reads, with the reason written next to it.
@@ -17,13 +21,16 @@ addons/                keeps the `addons` Application out of ComparisonError
 TEMPLATE_VERSION       semver; see CHANGELOG.md
 ```
 
-## Use it
+## Use this template
 
-1. **Use this template** (the green button) to create your own repository. You do not need to fork
-   it, and nothing here phones home.
-2. In Alethia, open the environment → **Repositories** → set **ArgoCD apps repository** to your new
+**Use this template** (the green button) to create your own repository. You do not need to fork it,
+and nothing here phones home.
+
+## Connect it in Alethia
+
+1. In Alethia, open the environment → **Repositories** → set **ArgoCD apps repository** to your new
    repository. Leave **Overlay path** empty.
-3. Deploy.
+2. Deploy.
 
 Or from the CLI:
 
@@ -35,7 +42,12 @@ alethia project component add --project <project> --env <env> --kind repositorie
 A **public** repository needs no Git token — ArgoCD clones it anonymously. A private one needs the
 Git provider connected for the job owner.
 
-## What you should see
+The docs page that covers this template, and the other two:
+[Starter Templates](https://alethialabs.io/docs/console/design-project/starter-templates). What an
+apps repository must contain, and what Alethia commits back into it:
+[Repositories](https://alethialabs.io/docs/console/design-project/repositories).
+
+### What you should see
 
 | ArgoCD Application | Source path | Namespace | What it runs |
 |---|---|---|---|
@@ -49,7 +61,9 @@ kubectl -n starter-staging get deploy,svc
 kubectl -n starter-staging port-forward svc/hello 8080:80
 ```
 
-## The four rules this template exists to demonstrate
+## The contract
+
+### The four rules this template exists to demonstrate
 
 **1. The root needs at least one manifest.** The root Application hardcodes `targetRevision: HEAD`
 and `path: .` (or the overlay path you name). A root with nothing in it yields an Application that
@@ -75,7 +89,7 @@ destination namespace, so `CreateNamespace=true` has nothing to create, and a ma
 namespace that does not exist fails to sync. Every directory here is therefore deliverable on its
 own — which is what makes `apps_path=overlays/dev` work as well as discovery does.
 
-## Which placement this template targets
+### Which placement this template targets
 
 **A dedicated cluster.** The root and the overlays each create a `Namespace`, which is a
 cluster-scoped resource. The `apps` ArgoCD project is wide open on a dedicated cluster and permits
@@ -86,7 +100,7 @@ On a namespace or vcluster placement, drop the `Namespace` objects and the `name
 transformers: Alethia has already created your namespace, the single Application it renders
 delivers exactly one path, and overlay discovery does not run.
 
-## A commit to the default branch deploys
+### A commit to the default branch deploys
 
 The Applications sync automatically, prune, and self-heal:
 
@@ -97,11 +111,21 @@ The Applications sync automatically, prune, and self-heal:
 **Write access to the default branch is deploy access to the environment.** Restrict the branch if
 that is not what you want.
 
-## CI
+### CI
 
 `.github/workflows/validate.yml` runs on every push and costs nothing: `kustomize build` over the
-root and every overlay, plus the four assertions above as explicit steps. The version job runs only
-in `alethialabs-io` — your clone's release discipline is yours.
+root and every overlay, plus the four assertions above as explicit steps.
+
+## Versioning
+
+`TEMPLATE_VERSION` holds the current version, in [semantic versioning](https://semver.org).
+`CHANGELOG.md` records each release and says which change is which bump. CI fails a change to the
+delivered manifests that does not move `TEMPLATE_VERSION`. That version job runs only in
+`alethialabs-io` — your clone's release discipline is yours.
+
+## Licence
+
+Apache-2.0. See [`LICENSE`](./LICENSE) and [`NOTICE`](./NOTICE).
 
 ## The other starter templates
 
